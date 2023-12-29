@@ -580,3 +580,248 @@
 //     return 0;
 // }
 
+
+// #include <iostream>
+// #include <vector>
+
+// void insertionSort(std::vector<int>& arr) {
+//     int n = arr.size();
+
+//     for (int i = 1; i < n; i++) {
+//         int key = arr[i];
+//         int j = i - 1;
+
+//         // Move elements of arr[0..i-1] that are greater than key to one position ahead of their current position
+//         while (j >= 0 && arr[j] > key) {
+//             arr[j + 1] = arr[j];
+//             j--;
+//         }
+
+//         arr[j + 1] = key;
+//     }
+// }
+
+// int main() {
+//     std::vector<int> arr = {12, 11, 13, 5, 6};
+
+//     std::cout << "Original array: ";
+//     for (int num : arr) {
+//         std::cout << num << " ";
+//     }
+//     std::cout << std::endl;
+
+//     // Perform insertion sort
+//     insertionSort(arr);
+
+//     std::cout << "Sorted array: ";
+//     for (int num : arr) {
+//         std::cout << num << " ";
+//     }
+//     std::cout << std::endl;
+
+//     return 0;
+// }
+
+
+// #include <iostream>
+// #include <vector>
+
+// void selectionSort(std::vector<int>& arr) {
+//     int n = arr.size();
+
+//     for (int i = 0; i < n - 1; i++) {
+//         // Find the minimum element in the unsorted part of the array
+//         int minIndex = i;
+//         for (int j = i + 1; j < n; j++) {
+//             if (arr[j] < arr[minIndex]) {
+//                 minIndex = j;
+//             }
+//         }
+
+//         // Swap the found minimum element with the first element
+//         std::swap(arr[i], arr[minIndex]);
+//     }
+// }
+
+// int main() {
+//     std::vector<int> arr = {64, 25, 12, 22, 11};
+
+//     std::cout << "Original array: ";
+//     for (int num : arr) {
+//         std::cout << num << " ";
+//     }
+//     std::cout << std::endl;
+
+//     // Perform selection sort
+//     selectionSort(arr);
+
+//     std::cout << "Sorted array: ";
+//     for (int num : arr) {
+//         std::cout << num << " ";
+//     }
+//     std::cout << std::endl;
+
+//     return 0;
+// }
+
+
+// #include <iostream>
+// #include <vector>
+// #include <list>
+
+// class HashTable {
+// private:
+//     std::vector<std::list<int>> table;
+//     int size;
+
+// public:
+//     HashTable(int tableSize) : size(tableSize) {
+//         table.resize(size);
+//     }
+
+//     // Hash function to map values to index
+//     int hash(int key) {
+//         return key % size;
+//     }
+
+//     // Insert a key into the hash table
+//     void insert(int key) {
+//         int index = hash(key);
+//         table[index].push_back(key);
+//     }
+
+//     // Search for a key in the hash table
+//     bool search(int key) {
+//         int index = hash(key);
+//         for (int value : table[index]) {
+//             if (value == key) {
+//                 return true;
+//             }
+//         }
+//         return false;
+//     }
+
+//     // Print the hash table
+//     void printTable() {
+//         for (int i = 0; i < size; ++i) {
+//             std::cout << "Bucket " << i << ": ";
+//             for (int value : table[i]) {
+//                 std::cout << value << " ";
+//             }
+//             std::cout << std::endl;
+//         }
+//     }
+// };
+
+// int main() {
+//     HashTable hashTable(10);
+
+//     hashTable.insert(12);
+//     hashTable.insert(22);
+//     hashTable.insert(42);
+//     hashTable.insert(7);
+
+//     std::cout << "Hash Table:" << std::endl;
+//     hashTable.printTable();
+
+//     int searchKey = 22;
+//     if (hashTable.search(searchKey)) {
+//         std::cout << "Key " << searchKey << " found in the hash table." << std::endl;
+//     } else {
+//         std::cout << "Key " << searchKey << " not found in the hash table." << std::endl;
+//     }
+
+//     return 0;
+// }
+
+
+// #include <iostream>
+// #include <vector>
+// #include <list>
+
+// class HashTable {
+// private:
+//     std::vector<std::list<int>> table;
+//     int size;
+
+// public:
+//     HashTable(int tableSize) : size(tableSize) {
+//         table.resize(size);
+//     }
+
+//     // Hash function to map values to index
+//     int hash(int key) {
+//         return key % size;
+//     }
+
+//     // Quadratic probing function to calculate the next index
+//     int quadraticProbing(int index, int attempt) {
+//         return (index + attempt * attempt) % size;
+//     }
+
+//     // Insert a key into the hash table with quadratic probing
+//     void insert(int key) {
+//         int index = hash(key);
+//         int attempt = 0;
+
+//         while (!table[index].empty()) {
+//             // Collision occurred, use quadratic probing
+//             attempt++;
+//             index = quadraticProbing(index, attempt);
+//         }
+
+//         table[index].push_back(key);
+//     }
+
+//     // Search for a key in the hash table
+//     bool search(int key) {
+//         int index = hash(key);
+//         int attempt = 0;
+
+//         while (!table[index].empty()) {
+//             for (int value : table[index]) {
+//                 if (value == key) {
+//                     return true;
+//                 }
+//             }
+
+//             // Collision occurred, use quadratic probing
+//             attempt++;
+//             index = quadraticProbing(index, attempt);
+//         }
+
+//         return false;
+//     }
+
+//     // Print the hash table
+//     void printTable() {
+//         for (int i = 0; i < size; ++i) {
+//             std::cout << "Bucket " << i << ": ";
+//             for (int value : table[i]) {
+//                 std::cout << value << " ";
+//             }
+//             std::cout << std::endl;
+//         }
+//     }
+// };
+
+// int main() {
+//     HashTable hashTable(10);
+
+//     hashTable.insert(12);
+//     hashTable.insert(22);
+//     hashTable.insert(42);
+//     hashTable.insert(7);
+
+//     std::cout << "Hash Table:" << std::endl;
+//     hashTable.printTable();
+
+//     int searchKey = 22;
+//     if (hashTable.search(searchKey)) {
+//         std::cout << "Key " << searchKey << " found in the hash table." << std::endl;
+//     } else {
+//         std::cout << "Key " << searchKey << " not found in the hash table." << std::endl;
+//     }
+
+//     return 0;
+// }
