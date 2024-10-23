@@ -1,0 +1,93 @@
+import queue
+import math
+import matplotlib.pyplot as plt
+import networkx as nx
+from prettyprinter import pprint
+import time
+
+G = {
+    'A': {'pos': (0, 0), 'neighbors': {'B': 2, 'C': 4}},
+    'B': {'pos': (1, 2), 'neighbors': {'A': 2, 'C': 1, 'D': 7}},
+    'C': {'pos': (2, 1), 'neighbors': {'A': 4, 'B': 1, 'D': 3, 'E': 5, 'F': 2}},
+    'D': {'pos': (3, 3), 'neighbors': {'B': 7, 'C': 3, 'E': 1, 'F': 2}},
+    'E': {'pos': (4, 2), 'neighbors': {'C': 2, 'D': 1, 'F': 1}},
+    'F': {'pos': (0, 0), 'neighbors': {'C': 2, 'D': 2, 'E': 1}}
+}
+
+def heuristic(node, goal):
+    x1, y1 = G[node]['pos']
+    x2, y2 = G[goal]['pos']
+    return math.sqrt((x2-x1)**2 + (y2-y1)**2)
+
+def Astar(startNode, goalNode):
+    priorityQueue = queue.PriorityQueue()
+    distance = 0
+    path = []
+    expanded_nodes = 0
+    total_cost = 0
+
+    priorityQueue.put((heuristic(startNode, goalNode) + distance, [startNode, 0]))
+
+    while not priorityQueue.empty():
+        current = priorityQueue.get()[1]
+        path.append(current[0])
+        distance += int(current[1])
+        expanded_nodes += 1
+
+        if current[0] == goalNode:
+            break
+
+        priorityQueue = queue.PriorityQueue()
+
+        for neighbor, weight in G[current[0]]['neighbors'].items():
+            if neighbor not in path:
+                priorityQueue.put((heuristic(neighbor, goalNode) + int(weight) + distance, [neighbor, weight]))
+                total_cost += weight
+
+    return path, total_cost, expanded_nodes
+
+def drawGraph(graph, astar_path):
+    G = nx.Graph()
+
+    for node in graph:
+        for neighbor, weight in graph[node]['neighbors'].items():
+            G.add_edge(node, neighbor, weight=weight)
+
+    pos = nx.spring_layout(G)
+
+    nx.draw(G, pos, with_labels=True, node_color='lightblue', node_size=500, font_size=10)
+
+    lab = nx.get_edge_attributes(G, 'weight')
+
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=lab)
+
+    astar_edges = list(zip(astar_path, astar_path[1:]))
+
+    nx.draw_networkx_edges(G, pos, edgelist=astar_edges, edge_color='red', width=2, label='A*')
+
+    plt.legend(["A*"])
+    plt.show()
+
+def main():
+    print(G.keys())
+    while True:
+        startNode = input("Enter start node (or 'q' to quit): ")
+        if startNode.lower() == 'q':
+            break
+        goalNode = input("Enter goal node: ")
+
+        start_time = time.time()
+
+        astar_result = Astar(startNode, goalNode)
+        print("ASTAR =>", astar_result[0])
+        drawGraph(G, astar_result[0])
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+
+        print("Time Taken: " + str(elapsed_time) + " ms")
+        print("Total Cost: " + str(astar_result[1]))
+        print("Expanded Nodes: " + str(astar_result[2]))
+        print()
+
+if __name__ == "__main__":
+    main()
