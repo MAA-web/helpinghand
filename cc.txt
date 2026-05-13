@@ -1,0 +1,1268 @@
+lab 10
+
+Task 1 & 2: Relational Logic & Register Optimization
+This implementation includes a "Register Descriptor" (Task 2) to prevent redundant loads and supports comparison operators (Task 1).
+
+1. lexer.l (The Scanner)
+Code snippet
+%{
+#include "y.tab.h"
+%}
+
+%%
+[0-9]+          { yylval.str = strdup(yytext); return NUM; }
+[a-zA-Z][a-zA-Z0-9]* { yylval.str = strdup(yytext); return ID; }
+"+"             { return PLUS; }
+"-"             { return MINUS; }
+"*"             { return MUL; }
+"/"             { return DIV; }
+"<"             { return LT; }
+">"             { return GT; }
+"=="            { return EQ; }
+"="             { return ASSIGN; }
+[ \t\n]         ; /* skip whitespace */
+.               { return yytext[0]; }
+%%
+
+int yywrap() { return 1; }
+2. parser.y (The Generator)
+This parser takes simple expressions and outputs them in the 4-column format: Result Arg1 Op Arg2.
+
+Code snippet
+%{
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+void yyerror(const char *s);
+int yylex();
+int temp_count = 0;
+char* new_temp();
+%}
+
+%union { char* str; }
+%token <str> ID NUM
+%token PLUS MINUS MUL DIV ASSIGN LT GT EQ
+%type <str> exp
+
+%right ASSIGN
+%left LT GT EQ
+%left PLUS MINUS
+%left MUL DIV
+
+%%
+stmt_list: stmt | stmt_list stmt;
+
+stmt: ID ASSIGN exp { printf("%s %s = NULL\n", $1, $3); };
+
+exp: exp PLUS exp  { $$ = new_temp(); printf("%s %s + %s\n", $$, $1, $3); }
+   | exp MINUS exp { $$ = new_temp(); printf("%s %s - %s\n", $$, $1, $3); }
+   | exp MUL exp   { $$ = new_temp(); printf("%s %s * %s\n", $$, $1, $3); }
+   | exp DIV exp   { $$ = new_temp(); printf("%s %s / %s\n", $$, $1, $3); }
+   | exp LT exp    { $$ = new_temp(); printf("%s %s < %s\n", $$, $1, $3); }
+   | exp GT exp    { $$ = new_temp(); printf("%s %s > %s\n", $$, $1, $3); }
+   | exp EQ exp    { $$ = new_temp(); printf("%s %s == %s\n", $$, $1, $3); }
+   | ID            { $$ = $1; }
+   | NUM           { $$ = $1; }
+   ;
+
+%%
+char* new_temp() {
+    char* s = malloc(10);
+    sprintf(s, "t%d", temp_count++);
+    return s;
+}
+
+void yyerror(const char *s) { fprintf(stderr, "%s\n", s); }
+
+int main() {
+    yyparse();
+    return 0;
+}
+
+task 3 
+
+1. lexer.l
+This scanner identifies identifiers, numbers, and the necessary operators for arithmetic and relational logic.
+
+Code snippet
+%{
+#include "y.tab.h"
+#include <string.h>
+%}
+
+%%
+[0-9]+          { yylval.str = strdup(yytext); return NUM; }
+[a-zA-Z][a-zA-Z0-9]* { yylval.str = strdup(yytext); return ID; }
+"+"             { return PLUS; }
+"-"             { return MINUS; }
+"*"             { return MUL; }
+"/"             { return DIV; }
+"<"             { return LT; }
+">"             { return GT; }
+"=="            { return EQ; }
+"="             { return ASSIGN; }
+[ \t\n]         ; /* skip whitespace */
+.               { return yytext[0]; }
+%%
+
+int yywrap() { return 1; }
+2. parser.y
+This file contains the logic for Task 2 (Tracking) and Task 3 (Two Registers). It maintains a state of what is currently in R0 and R1 to skip redundant LOAD instructions.
+
+Code snippet
+%{
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+void yyerror(const char *s);
+int yylex();
+
+/* Task 2: Register Tracking State */
+char reg0[20] = "";
+char reg1[20] = "";
+
+int temp_count = 0;
+char* new_temp();
+
+/* Task 3 logic: Generating code using two registers */
+void gen_code(char* res, char* a1, char* op, char* a2) {
+    printf("\n; --- TAC: %s = %s %s %s ---\n", res, a1, op, a2);
+
+    // Load R0 (Arg1) only if not already there (Task 2)
+    if (strcmp(reg0, a1) != 0) {
+        printf("LOAD  R0, %s\n", a1);
+        strcpy(reg0, a1);
+    }
+
+    // Load R1 (Arg2) for Multi-Register math (Task 3)
+    if (strcmp(a2, "NULL") != 0) {
+        if (strcmp(reg1, a2) != 0) {
+            printf("LOAD  R1, %s\n", a2);
+            strcpy(reg1, a2);
+        }
+    }
+
+    // Task 1: Relational + Task 3: Reg-to-Reg Arithmetic
+    if (strcmp(op, "+") == 0)      printf("ADD   R0, R1\n");
+    else if (strcmp(op, "-") == 0) printf("SUB   R0, R1\n");
+    else if (strcmp(op, "*") == 0) printf("MUL   R0, R1\n");
+    else if (strcmp(op, "/") == 0) printf("DIV   R0, R1\n");
+    else if (strcmp(op, "<") == 0 || strcmp(op, ">") == 0 || strcmp(op, "==") == 0) {
+        printf("CMP   R0, R1\n");
+        printf("JMP_%s TRUE_LABEL\n", op);
+    }
+
+    // Store Result
+    printf("STORE %s, R0\n", res);
+    strcpy(reg0, res); // R0 now contains the result
+}
+%}
+
+%union { char* str; }
+%token <str> ID NUM
+%token PLUS MINUS MUL DIV ASSIGN LT GT EQ
+%type <str> exp
+
+%right ASSIGN
+%left LT GT EQ
+%left PLUS MINUS
+%left MUL DIV
+
+%%
+prog: stmt_list;
+
+stmt_list: stmt | stmt_list stmt;
+
+stmt: ID ASSIGN exp { gen_code($1, $3, "=", "NULL"); };
+
+exp: exp PLUS exp  { $$ = new_temp(); gen_code($$, $1, "+", $3); }
+   | exp MINUS exp { $$ = new_temp(); gen_code($$, $1, "-", $3); }
+   | exp MUL exp   { $$ = new_temp(); gen_code($$, $1, "*", $3); }
+   | exp DIV exp   { $$ = new_temp(); gen_code($$, $1, "/", $3); }
+   | exp LT exp    { $$ = new_temp(); gen_code($$, $1, "<", $3); }
+   | exp GT exp    { $$ = new_temp(); gen_code($$, $1, ">", $3); }
+   | exp EQ exp    { $$ = new_temp(); gen_code($$, $1, "==", $3); }
+   | ID            { $$ = $1; }
+   | NUM           { $$ = $1; }
+   ;
+
+%%
+char* new_temp() {
+    char* s = malloc(10);
+    sprintf(s, "t%d", temp_count++);
+    return s;
+}
+
+void yyerror(const char *s) { fprintf(stderr, "Error: %s\n", s); }
+
+int main() {
+    printf("; Starting Optimized Code Generation\n");
+    yyparse();
+    return 0;
+}
+
+
+
+lab 9   ambiguous and un ambiguous grammer
+
+
+
+lexer.l
+
+Save as lexer.l
+
+%{
+#include "parser.tab.h"
+#include <stdio.h>
+%}
+
+%%
+
+[ \t\n]+                ;   /* Ignore spaces */
+
+"+"                     { return PLUS; }
+"-"                     { return MINUS; }
+"*"                     { return MULT; }
+"/"                     { return DIV; }
+
+"("                     { return LPAREN; }
+")"                     { return RPAREN; }
+
+/* Numbers */
+[0-9]+                  { return NUM; }
+
+/* Identifiers */
+[a-zA-Z_][a-zA-Z0-9_]*  { return ID; }
+
+/* Invalid character */
+.                       { return yytext[0]; }
+
+%%
+
+int yywrap(void)
+{
+    return 1;
+}
+4. Final parser.y
+
+Save as parser.y
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+
+void yyerror(const char *s);
+int yylex(void);
+%}
+
+/* Tokens */
+%token ID NUM
+%token PLUS MINUS
+%token MULT DIV
+%token LPAREN RPAREN
+
+%%
+
+/* Expression rules */
+E :
+      E PLUS T
+        { printf("Reduce: E -> E + T\n"); }
+    | E MINUS T
+        { printf("Reduce: E -> E - T\n"); }
+    | T
+        { printf("Reduce: E -> T\n"); }
+    ;
+
+/* Term rules */
+T :
+      T MULT F
+        { printf("Reduce: T -> T * F\n"); }
+    | T DIV F
+        { printf("Reduce: T -> T / F\n"); }
+    | F
+        { printf("Reduce: T -> F\n"); }
+    ;
+
+/* Factor rules */
+F :
+      LPAREN E RPAREN
+        { printf("Reduce: F -> (E)\n"); }
+    | ID
+        { printf("Reduce: F -> id\n"); }
+    | NUM
+        { printf("Reduce: F -> num\n"); }
+    ;
+
+%%
+
+void yyerror(const char *s)
+{
+    printf("Error: %s\n", s);
+}
+
+int main()
+{
+    printf("Enter an expression: ");
+    
+    if (yyparse() == 0)
+    {
+        printf("Parsing completed successfully.\n");
+    }
+
+    return 0;
+}
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+lexer.l
+%{
+#include "parser.tab.h"
+#include <stdio.h>
+%}
+
+%%
+
+/* Ignore spaces, tabs, newlines */
+[ \t\n]+                ;
+
+/* Operators */
+"+"                     { return PLUS; }
+"-"                     { return MINUS; }
+"*"                     { return MULT; }
+"/"                     { return DIV; }
+
+/* Parentheses */
+"("                     { return LPAREN; }
+")"                     { return RPAREN; }
+
+/* Numbers */
+[0-9]+                  { return NUM; }
+
+/* Identifiers */
+[a-zA-Z_][a-zA-Z0-9_]*  { return ID; }
+
+/* Invalid characters */
+.                       { return yytext[0]; }
+
+%%
+
+int yywrap(void)
+{
+    return 1;
+}
+parser.y
+%{
+#include <stdio.h>
+#include <stdlib.h>
+
+void yyerror(const char *s);
+int yylex(void);
+%}
+
+/* Token declarations */
+%token ID NUM
+%token PLUS MINUS
+%token MULT DIV
+%token LPAREN RPAREN
+
+%%
+
+/* Expression rules (+ and -) */
+E :
+      E PLUS T
+        { printf("Reduce: E -> E + T\n"); }
+    | E MINUS T
+        { printf("Reduce: E -> E - T\n"); }
+    | T
+        { printf("Reduce: E -> T\n"); }
+    ;
+
+/* Term rules (* and /) */
+T :
+      T MULT F
+        { printf("Reduce: T -> T * F\n"); }
+    | T DIV F
+        { printf("Reduce: T -> T / F\n"); }
+    | F
+        { printf("Reduce: T -> F\n"); }
+    ;
+
+/* Factor rules */
+F :
+      LPAREN E RPAREN
+        { printf("Reduce: F -> (E)\n"); }
+    | ID
+        { printf("Reduce: F -> id\n"); }
+    | NUM
+        { printf("Reduce: F -> num\n"); }
+    ;
+
+%%
+
+void yyerror(const char *s)
+{
+    printf("Error: %s\n", s);
+}
+
+int main()
+{
+    printf("Enter an expression: ");
+
+    if (yyparse() == 0)
+    {
+        printf("Parsing completed successfully.\n");
+    }
+
+    return 0;
+}
+
+
+
+
+lab 8 code optimisations 
+
+
+task 1
+
+%{
+#include "scope_parser.tab.h"
+#include <string.h>
+%}
+
+%%
+
+"int"                   { return INT; }
+"void"                  { return VOID; }
+[0-9]+                  { return NUM; }
+[a-zA-Z_][a-zA-Z0-9_]*  { yylval.str = strdup(yytext); return ID; }
+
+"("                     { return '('; }
+")"                     { return ')'; }
+"{"                     { return '{'; }
+"}"                     { return '}'; }
+";"                     { return ';'; }
+"="                     { return '='; }
+
+[ \t\r\n]+              { /* ignore whitespace */ }
+.                       { return yytext[0]; }
+
+%%
+
+int yywrap(void) {
+    return 1;
+}
+
+
+
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int yylex(void);
+void yyerror(const char *s);
+
+
+#define MAX_SYMBOLS 100
+
+char *global_vars[MAX_SYMBOLS];
+char *local_vars[MAX_SYMBOLS];
+char *functions[MAX_SYMBOLS];
+
+int global_count = 0;
+int local_count = 0;
+int function_count = 0;
+int in_function = 0;
+
+
+int exists(char *table[], int count, const char *name) {
+    for (int i = 0; i < count; i++) {
+      if (strcmp(table[i], name) == 0) return 1;
+    }
+    return 0;
+}
+
+void add_global(const char *name) {
+    if (!exists(global_vars, global_count, name)) {
+      global_vars[global_count++] = strdup(name);
+    }
+}
+
+void add_local(const char *name) {
+    if (!exists(local_vars, local_count, name)) {
+        local_vars[local_count++] = strdup(name);
+    }
+}
+
+void add_function(const char *name) {
+    if (!exists(functions, function_count, name)) {
+        functions[function_count++] = strdup(name);
+    }
+}
+void clear_locals(void) {
+    for (int i = 0; i < local_count; i++) {
+        free(local_vars[i]);
+    }
+    local_count = 0;
+}
+void enter_function_scope(void) {
+    in_function = 1;
+    clear_locals();
+}
+
+void exit_function_scope(void) {
+    in_function = 0;
+    clear_locals();
+}
+
+int check_function_declared(const char *name) {
+    if (exists(functions, function_count, name)) return 1;
+    printf("Semantic Error: Function '%s' used before declaration\n", name);
+    return 0;
+}
+
+
+
+
+
+int check_variable_visible(const char *name) {
+    if (in_function) {
+        if (exists(local_vars, local_count, name) ||
+            exists(global_vars, global_count, name)) {
+            return 1;
+        }
+    } else {
+        if (exists(global_vars, global_count, name)) {
+            return 1;
+        }
+    }
+
+    printf("Semantic Error: '%s' undeclared\n", name);
+    return 0;
+}
+
+
+
+
+
+%}
+
+
+
+
+
+
+%union {
+    char *str;
+}
+
+%token INT VOID NUM
+%token <str> ID
+
+%%
+
+program
+    : items
+      {
+          printf("Valid Program!\n");
+      }
+    ;
+
+items
+    : items item
+    | /* empty */
+    ;
+
+item
+    : global_decl
+    | function_def
+    | func_call
+    ;
+
+global_decl
+    : INT ID ';'
+      {
+          add_global($2);
+          free($2);
+      }
+    ;
+
+function_def
+    : VOID ID '(' ')'
+      {
+          add_function($2);          /* declare function as soon as header is seen */
+          enter_function_scope();    /* start local scope */
+          free($2);
+      }
+      '{' stmts '}'
+      {
+          exit_function_scope();
+      }
+    ;
+
+stmts
+    : stmts stmt
+    | /* empty */
+    ;
+
+stmt
+    : local_decl
+    | assignment
+    | func_call
+    ;
+
+local_decl
+    : INT ID ';'
+      {
+          add_local($2);
+          free($2);
+      }
+    ;
+
+assignment
+    : ID '=' NUM ';'
+      {
+          if (!check_variable_visible($1)) {
+              free($1);
+              YYABORT;
+          }
+          free($1);
+      }
+    ;
+
+func_call
+    : ID '(' ')' ';'
+      {
+          if (!check_function_declared($1)) {
+              free($1);
+              YYABORT;
+          }
+          free($1);
+      }
+    ;
+
+%%
+
+int main(void) {
+    return yyparse();
+}
+
+void yyerror(const char *s) {
+    printf("Syntax Error!\n");
+}
+
+
+task 2
+
+%{
+
+
+#include "array_parser.tab.h"
+
+#include <stdlib.h>
+
+#include <string.h>
+
+%}
+
+
+
+%%
+
+"int"                   { return INT; }
+"float"                 { return FLOAT; }
+
+[0-9]+"."[0-9]+         { return FLOAT_LIT; }
+[0-9]+                  { yylval.num = atoi(yytext); return INT_LIT; }
+
+[a-zA-Z_][a-zA-Z0-9_]*  { yylval.str = strdup(yytext); return ID; }
+
+"["                     { return '['; }
+"]"                     { return ']'; }
+"="                     { return '='; }
+";"                     { return ';'; }
+"-"                     { return '-'; }
+
+[ \t\r\n]+              { /* ignore whitespace */ }
+.                       { return yytext[0]; }
+
+%%
+
+
+
+int yywrap(void) {
+    return 1;
+}
+
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int yylex(void);
+void yyerror(const char *s);
+
+#define MAX_ARRAYS 100
+#define TYPE_INT   1
+#define TYPE_FLOAT 2
+
+
+
+
+typedef struct {
+    char *name;
+    int type;
+    int size;
+} ArraySymbol;
+
+
+
+
+ArraySymbol arrays[MAX_ARRAYS];
+int array_count = 0;
+
+int find_array(const char *name) {
+    for (int i = 0; i < array_count; i++) {
+        if (strcmp(arrays[i].name, name) == 0) return i;
+    }
+    return -1;
+}
+
+
+
+
+
+const char *type_name(int t) {
+    if (t == TYPE_INT) return "int";
+    if (t == TYPE_FLOAT) return "float";
+    return "unknown";
+}
+
+
+
+
+void add_array(const char *name, int type, int size) {
+    if (find_array(name) == -1) {
+        arrays[array_count].name = strdup(name);
+        arrays[array_count].type = type;
+        arrays[array_count].size = size;
+        array_count++;
+    }
+}
+
+
+
+
+
+
+
+int check_array_assignment(const char *name, int index, int value_type) {
+    int pos = find_array(name);
+
+    if (pos == -1) {
+        printf("Semantic Error: '%s' undeclared\n", name);
+        return 0;
+    }
+
+    if (index < 0) {
+        printf("Semantic Error: Invalid array index (%d)\n", index);
+        return 0;
+    }
+
+    if (index >= arrays[pos].size) {
+        printf("Semantic Error: Array index %d out of bounds for '%s' of size %d\n",
+               index, name, arrays[pos].size);
+        return 0;
+    }
+
+    if (arrays[pos].type != value_type) {
+        printf("Semantic Error: Type mismatch (%s vs %s)\n",
+               type_name(arrays[pos].type), type_name(value_type));
+        return 0;
+    }
+
+    return 1;
+}
+
+
+
+
+%}
+
+%union {
+    char *str;
+    int num;
+    int type;
+}
+
+%token INT FLOAT
+%token <str> ID
+
+
+%token <num> INT_LIT
+%token FLOAT_LIT
+
+%type <type> type value
+%type <num> index
+
+%%
+
+program
+    : items
+      {
+          printf("Valid Program!\n");
+      }
+    ;
+
+items
+    : items item
+    | /* empty */
+    ;
+
+item
+    : array_decl
+    | array_assign
+    ;
+
+type
+    : INT   { $$ = TYPE_INT; }
+    | FLOAT { $$ = TYPE_FLOAT; }
+    ;
+
+
+
+
+array_decl
+    : type ID '[' INT_LIT ']' ';'
+      {
+          add_array($2, $1, $4);
+          free($2);
+      }
+    ;
+
+array_assign
+    : ID '[' index ']' '=' value ';'
+      {
+          if (!check_array_assignment($1, $3, $6)) {
+              free($1);
+              YYABORT;
+          }
+          free($1);
+      }
+    ;
+
+
+
+
+index
+    : INT_LIT         { $$ = $1; }
+    | '-' INT_LIT     { $$ = -$2; }
+    ;
+
+value
+    : INT_LIT         { $$ = TYPE_INT; }
+    | FLOAT_LIT       { $$ = TYPE_FLOAT; }
+    ;
+
+%%
+
+int main(void) {
+    return yyparse();
+}
+
+void yyerror(const char *s) {
+    printf("Syntax Error!\n");
+}
+
+
+
+
+
+
+lab 7 TAC Instructions
+
+
+lexer.l
+%{
+#include "parser.tab.h"
+#include <string.h>
+#include <stdlib.h>
+%}
+
+%%
+
+[a-zA-Z_][a-zA-Z0-9_]* {
+    yylval.str = strdup(yytext);
+    return ID;
+}
+
+[0-9]+ {
+    yylval.str = strdup(yytext);
+    return NUM;
+}
+
+"="     { return ASSIGN; }
+"+"     { return PLUS; }
+"-"     { return MINUS; }
+"*"     { return MULT; }
+"/"     { return DIV; }
+"("     { return LPAREN; }
+")"     { return RPAREN; }
+";"     { return SEMICOLON; }
+
+[ \t\n]+   ;   /* ignore whitespace */
+
+. { return yytext[0]; }
+
+%%
+
+int yywrap()
+{
+    return 1;
+}
+parser.y
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int yylex();
+void yyerror(const char *s);
+
+int tempCount = 1;
+
+/* Create new temporary variable */
+char* newTemp()
+{
+    char *temp = malloc(10);
+    sprintf(temp, "t%d", tempCount++);
+    return temp;
+}
+
+/* Generate TAC */
+void gen(char* result, char* arg1, char* op, char* arg2)
+{
+    printf("%s = %s %s %s\n", result, arg1, op, arg2);
+}
+
+/* Generate assignment */
+void genAssign(char* id, char* value)
+{
+    printf("%s = %s\n", id, value);
+}
+%}
+
+%union {
+    char* str;
+}
+
+%token <str> ID NUM
+%token ASSIGN
+%token PLUS MINUS MULT DIV
+%token LPAREN RPAREN
+%token SEMICOLON
+
+%type <str> expr term factor
+
+%%
+
+stmt:
+      ID ASSIGN expr SEMICOLON
+      {
+          genAssign($1, $3);
+      }
+    ;
+
+expr:
+      expr PLUS term
+      {
+          char* temp = newTemp();
+          gen(temp, $1, "+", $3);
+          $$ = temp;
+      }
+    | expr MINUS term
+      {
+          char* temp = newTemp();
+          gen(temp, $1, "-", $3);
+          $$ = temp;
+      }
+    | term
+      {
+          $$ = $1;
+      }
+    ;
+
+term:
+      term MULT factor
+      {
+          char* temp = newTemp();
+          gen(temp, $1, "*", $3);
+          $$ = temp;
+      }
+    | term DIV factor
+      {
+          char* temp = newTemp();
+          gen(temp, $1, "/", $3);
+          $$ = temp;
+      }
+    | factor
+      {
+          $$ = $1;
+      }
+    ;
+
+factor:
+      LPAREN expr RPAREN
+      {
+          $$ = $2;
+      }
+    | ID
+      {
+          $$ = $1;
+      }
+    | NUM
+      {
+          $$ = $1;
+      }
+    ;
+
+%%
+
+int main()
+{
+    printf("Enter expression:\n");
+    yyparse();
+    return 0;
+}
+
+void yyerror(const char *s)
+{
+    printf("Syntax Error: %s\n", s);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+lexer.l
+%{
+#include "parser.tab.h"
+#include <string.h>
+#include <stdlib.h>
+%}
+
+%%
+
+[a-zA-Z_][a-zA-Z0-9_]* {
+    yylval.str = strdup(yytext);
+    return ID;
+}
+
+[0-9]+ {
+    yylval.str = strdup(yytext);
+    return NUM;
+}
+
+"="     { return ASSIGN; }
+"+"     { return PLUS; }
+"-"     { return MINUS; }
+"*"     { return MULT; }
+"/"     { return DIV; }
+
+"("     { return LPAREN; }
+")"     { return RPAREN; }
+
+";"     { return SEMICOLON; }
+
+[ \t\n]+   ;
+
+. { return yytext[0]; }
+
+%%
+
+int yywrap()
+{
+    return 1;
+}
+parser.y
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+int yylex();
+void yyerror(const char *s);
+
+int tempCount = 1;
+
+
+/* Create temp variable */
+char* newTemp()
+{
+    char* temp = malloc(10);
+    sprintf(temp, "t%d", tempCount++);
+    return temp;
+}
+
+
+/* Check if string is numeric */
+int isNumber(char* s)
+{
+    for(int i=0; s[i]; i++)
+    {
+        if(!isdigit(s[i]))
+            return 0;
+    }
+    return 1;
+}
+
+
+/* Generate TAC */
+void gen(char* result, char* a, char* op, char* b)
+{
+    printf("%s = %s %s %s\n", result, a, op, b);
+}
+
+
+/* Optimization + TAC generation */
+char* optimize(char* left, char* op, char* right)
+{
+    /* ---------- Constant Folding ---------- */
+    if(isNumber(left) && isNumber(right))
+    {
+        int x = atoi(left);
+        int y = atoi(right);
+        int ans;
+
+        if(strcmp(op,"+")==0) ans = x+y;
+        else if(strcmp(op,"-")==0) ans = x-y;
+        else if(strcmp(op,"*")==0) ans = x*y;
+        else if(strcmp(op,"/")==0) ans = x/y;
+
+        char* result = malloc(20);
+        sprintf(result,"%d",ans);
+
+        printf("Optimized: %s %s %s -> %s\n",
+                left, op, right, result);
+
+        return result;
+    }
+
+    /* ---------- Algebraic Simplifications ---------- */
+
+    if(strcmp(op,"+")==0)
+    {
+        if(strcmp(left,"0")==0) return strdup(right);
+        if(strcmp(right,"0")==0) return strdup(left);
+    }
+
+    if(strcmp(op,"*")==0)
+    {
+        if(strcmp(left,"1")==0) return strdup(right);
+        if(strcmp(right,"1")==0) return strdup(left);
+
+        if(strcmp(left,"0")==0) return strdup("0");
+        if(strcmp(right,"0")==0) return strdup("0");
+    }
+
+    /* ---------- Otherwise generate TAC ---------- */
+
+    char* temp = newTemp();
+    gen(temp,left,op,right);
+    return temp;
+}
+
+%}
+
+%union{
+    char* str;
+}
+
+%token <str> ID NUM
+%token ASSIGN
+%token PLUS MINUS MULT DIV
+%token LPAREN RPAREN
+%token SEMICOLON
+
+%type <str> expr term factor
+
+%%
+
+stmt:
+      ID ASSIGN expr SEMICOLON
+      {
+          printf("%s = %s\n", $1, $3);
+      }
+      ;
+
+expr:
+      expr PLUS term
+      {
+          $$ = optimize($1,"+",$3);
+      }
+    | expr MINUS term
+      {
+          $$ = optimize($1,"-",$3);
+      }
+    | term
+      {
+          $$ = $1;
+      }
+    ;
+
+term:
+      term MULT factor
+      {
+          $$ = optimize($1,"*",$3);
+      }
+    | term DIV factor
+      {
+          $$ = optimize($1,"/",$3);
+      }
+    | factor
+      {
+          $$ = $1;
+      }
+    ;
+
+factor:
+      LPAREN expr RPAREN
+      {
+          $$ = $2;
+      }
+    | ID
+      {
+          $$ = $1;
+      }
+    | NUM
+      {
+          $$ = $1;
+      }
+    ;
+
+%%
+
+int main()
+{
+    printf("Enter expression:\n");
+    yyparse();
+    return 0;
+}
+
+void yyerror(const char *s)
+{
+    printf("Syntax Error: %s\n", s);
+}
